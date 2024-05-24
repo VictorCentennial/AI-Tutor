@@ -26,7 +26,7 @@ async function loadDocuments() {
   //const loader = new TextLoader("./data/lecture_material.txt");
   const loader = new PDFLoader("./data/DataStructuresNotes.pdf");
   const docs = await loader.load();
-  console.log("Loaded documents:", docs);
+  console.log("Loaded documents:"); //, docs);
   return docs.map((doc) => preprocessDocument(doc));
 }
 
@@ -78,7 +78,11 @@ async function generateInitialResponse(prompt) {
     const response = await model.invoke([["human", augmentedQuery]]);
     //
     console.log("Response:", response.content);
-    return { response: response, endConversation: false };
+    return {
+      retrievedData: retrievedData,
+      response: response,
+      endConversation: false,
+    };
   } catch (error) {
     console.error("Error during initial response generation:", error);
     return {
@@ -88,10 +92,45 @@ async function generateInitialResponse(prompt) {
   }
 }
 
+// // Generate follow-up responses based on user interaction
+// async function generateFollowUpResponse(userInput, context) {
+//   try {
+//     const augmentedQuery = `${userInput.prompt} Considering your previous question: ${context.lastResponse}`;
+//     const response = await model.invoke([["human", augmentedQuery]]);
+
+//     return { response: response, endConversation: checkEndCondition(response) };
+//   } catch (error) {
+//     console.error("Error during follow-up response generation:", error);
+//     return {
+//       response: "An error occurred while generating the response.",
+//       endConversation: true,
+//     };
+//   }
+// }
+
 // Generate follow-up responses based on user interaction
-async function generateFollowUpResponse(userInput, context) {
+// async function generateFollowUpResponse(userInput, context) {
+//   try {
+//     const augmentedQuery = `${userInput.prompt} Considering your previous question: ${context.lastResponse}`;
+//     const response = await model.invoke([["human", augmentedQuery]]);
+
+//     return { response: response, endConversation: checkEndCondition(response) };
+//   } catch (error) {
+//     console.error("Error during follow-up response generation:", error);
+//     return {
+//       response: "An error occurred while generating the response.",
+//       endConversation: true,
+//     };
+//   }
+// }
+
+async function generateFollowUpResponse(context) {
   try {
-    const augmentedQuery = `${userInput.prompt} Considering your previous question: ${context.lastResponse}`;
+    // Convert the context object to a JSON string
+    const contextText = JSON.stringify(context);
+    const augmentedQuery = `$Answer the last question based on previous conversations: ${contextText}`;
+    console.log("Augmented Query:", augmentedQuery);
+
     const response = await model.invoke([["human", augmentedQuery]]);
 
     return { response: response, endConversation: checkEndCondition(response) };
