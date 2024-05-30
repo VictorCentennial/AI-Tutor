@@ -5,6 +5,10 @@ import { HarmBlockThreshold, HarmCategory } from "@google/generative-ai";
 import natural from "natural";
 import { TextLoader } from "langchain/document_loaders/fs/text";
 import { PDFLoader } from "langchain/document_loaders/fs/pdf";
+import fs from "fs";
+import path from "path";
+import { promisify } from "util";
+//testing
 
 // Configure the Gemini model
 const model = new ChatGoogleGenerativeAI({
@@ -148,4 +152,131 @@ function checkEndCondition(response) {
   return response.text.includes("Do you have any other questions?");
 }
 
-export { generateInitialResponse, generateFollowUpResponse };
+//Get courses and topics for data folder
+// function getCoursesAndTopics() {
+//   return new Promise((resolve, reject) => {
+//     const coursesDir = path.join("data"); // Adjust the path as needed
+//     const courses = [];
+
+//     fs.readdir(coursesDir, (err, folders) => {
+//       if (err) {
+//         return reject(`Failed to read courses directory ${coursesDir}: ${err}`);
+//       }
+
+//       let foldersProcessed = 0;
+
+//       folders.forEach((folder) => {
+//         const folderPath = path.join(coursesDir, folder);
+
+//         console.log("Folder Path: ", folderPath);
+
+//         fs.stat(folderPath, (err, stats) => {
+//           if (err) {
+//             return reject(`Failed to stat entry: ${entry}`);
+//           }
+
+//           if (stats.isDirectory()) {
+//             fs.readdir(folderPath, (err, files) => {
+//               if (err) {
+//                 return reject(`Failed to read folder: ${folder}`);
+//               }
+
+//               console.log("Files: ", files, "Folder: ", folder);
+
+//               courses.push({ name: folder, topics: files });
+//             });
+//           }
+//           foldersProcessed++;
+
+//           if (foldersProcessed === folders.length) {
+//             console.log("Courses: ", courses);
+//             resolve(courses);
+//           }
+//         });
+//       });
+//     });
+//   });
+// }
+
+const readdir = promisify(fs.readdir);
+const stat = promisify(fs.stat);
+
+const getCoursesAndTopics = () => {
+  return new Promise(async (resolve, reject) => {
+    try {
+      const coursesDir = path.join("data"); // Adjusted path
+      const entries = await readdir(coursesDir);
+      const courses = [];
+
+      // Map each folder to a promise
+      const folderPromises = entries.map(async (folder) => {
+        const folderPath = path.join(coursesDir, folder);
+        const folderStats = await stat(folderPath);
+
+        if (folderStats.isDirectory()) {
+          const files = await readdir(folderPath);
+          courses.push({ name: folder, topics: files });
+
+          // // Remove file extensions from filenames
+          // const topics = files.map((file) =>
+          //   path.basename(file, path.extname(file))
+          // );
+          // courses.push({ name: folder, topics });
+        }
+      });
+
+      // Wait for all folder promises to resolve
+      await Promise.all(folderPromises);
+
+      console.log("Courses: ", courses);
+      resolve(courses);
+    } catch (error) {
+      reject(`Failed to read courses directory: ${error.message}`);
+    }
+  });
+};
+
+//TODO - needa veryfy this function
+// Load and preprocess documents with file paths
+async function loadDocumentsWithParth(filePaths) {
+  const docs = [];
+
+  for (const filePath of filePaths) {
+    let loader;
+    const ext = path.extname(filePath);
+
+    if (ext === ".pdf") {
+      loader = new PDFLoader(filePath);
+    } else {
+      loader = new TextLoader(filePath);
+    }
+
+    const loadedDocs = await loader.load();
+    loadedDocs.forEach((doc) => {
+      docs.push(preprocessDocument(doc));
+    });
+  }
+
+  console.log("Loaded documents");
+  return docs;
+}
+
+//TODO - course path and name should be given by user
+const getFilesInCourse = (courseName) => {
+  return new Promise(async (resolve, reject) => {
+    try {
+      const coursePath = path.join("data", courseName);
+      const files = await readdir(coursePath);
+      const filePaths = files.map((file) => path.join(coursePath, file));
+      resolve(filePaths);
+    } catch (error) {
+      reject(`Failed to read files in course directory: ${error.message}`);
+    }
+  });
+};
+
+export {
+  generateInitialResponse,
+  generateFollowUpResponse,
+  getCoursesAndTopics,
+};

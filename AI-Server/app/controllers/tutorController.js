@@ -1,6 +1,7 @@
 import {
   generateInitialResponse,
   generateFollowUpResponse,
+  getCoursesAndTopics,
 } from "../models/aiModel.js";
 
 // Controller to handle the initial user query
@@ -62,5 +63,14 @@ export async function handleFollowUpQuery(req, res) {
     res
       .status(500)
       .send({ message: "Error in generating follow-up response." });
+  }
+}
+
+export async function getCourses(req, res) {
+  try {
+    const courses = await getCoursesAndTopics();
+    res.json(courses);
+  } catch (error) {
+    res.status(500).send({ message: `Error in loading courses: ${error}` });
   }
 }

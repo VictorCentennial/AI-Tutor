@@ -11,10 +11,6 @@ function App() {
   const [firstMessage, setFirstMessage] = useState(true);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    console.log(messages);
-  }, [messages]);
-
   const handleQuerySubmit = async (query) => {
     setLoading(true);
     // Append the user's query to the conversation
