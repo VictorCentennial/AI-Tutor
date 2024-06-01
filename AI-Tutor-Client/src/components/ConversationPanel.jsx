@@ -19,6 +19,8 @@ function ConversationPanel({ messages }) {
               </Card.Body>
             </Card>
           );
+        } else if (msg.type === "initialPrompt") {
+          return null;
         } else {
           // Just display user queries and errors as text
           return (

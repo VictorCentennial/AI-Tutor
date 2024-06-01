@@ -2,7 +2,7 @@
 import React, { useState } from "react";
 import { Form, Button } from "react-bootstrap";
 
-function QueryInput({ onQuerySubmit }) {
+function QueryInput({ onSubmit }) {
   const [query, setQuery] = useState("");
 
   const handleSubmit = async (event) => {
@@ -11,7 +11,7 @@ function QueryInput({ onQuerySubmit }) {
       // const response = await axios.post('http://localhost:3000/api/initial-query', { prompt: query });
       // console.log("Server Response:", response.data);
       // onQuerySubmit(query, response.data); // Pass the response data up to the App component
-      onQuerySubmit(query);
+      await onSubmit(query);
     } catch (error) {
       console.error("Error fetching data:", error);
     }

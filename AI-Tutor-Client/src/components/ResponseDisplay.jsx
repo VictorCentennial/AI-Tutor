@@ -22,10 +22,7 @@ const ResponseDisplay = ({ response }) => {
       </Card.Header>
       <Card.Body>
         <Card.Text>
-          <ReactMarkdown>
-            {response.text}
-            {/* Additional formatting can be applied here based on the type of response */}
-          </ReactMarkdown>
+          <ReactMarkdown>{response.text}</ReactMarkdown>
         </Card.Text>
       </Card.Body>
     </Card>
