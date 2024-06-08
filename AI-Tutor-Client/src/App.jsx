@@ -16,7 +16,9 @@ function App() {
   useEffect(() => {
     const fetchCourses = async () => {
       try {
-        const response = await axios.get("http://localhost:3000/api/courses");
+        const response = await axios.get("http://localhost:3000/api/courses", {
+          withCredentials: true,
+        });
         setCourses(response.data);
         console.log("fetch courses:", response.data);
       } catch (error) {
@@ -36,7 +38,10 @@ function App() {
       // 3. Send the initial setup request to the server
       const response = await axios.post(
         "http://localhost:3000/api/initial-query",
-        { course, topic }
+        { course, topic },
+        {
+          withCredentials: true,
+        }
       );
       setLoading(false);
       console.log("Server Response:", response);
@@ -70,7 +75,10 @@ function App() {
     try {
       const response = await axios.post(
         "http://localhost:3000/api/follow-up-query",
-        { messages: updatedMessages }
+        { messages: updatedMessages },
+        {
+          withCredentials: true,
+        }
       );
 
       setLoading(false);
@@ -102,7 +110,9 @@ function App() {
       console.log("AI Text Response:", aiMessage);
       console.log("AI Text Response type:", typeof aiMessage);
 
-      setMessages((prev) => [...prev, { type: "ai", text: aiMessage }]);
+      //setMessages((prev) => [...prev, { type: "ai", text: aiMessage }]);
+
+      setMessages((prev) => [...prev, { type: "ai", text: aiTextResponse }]);
     } catch (error) {
       console.error("Error during follow-up:", error);
       setMessages((prev) => [

@@ -75,6 +75,25 @@ async function readInitialPrompt(course, topic) {
   }
 }
 
+//create a function to summarize the documents
+async function summarizeDocuments(documents) {
+  ///summarize the documents with appropirate prompt and invoke the model
+  const prompt = `Summarize the documents to include all topicks from the documents: ${documents.join(
+    "\n\n"
+  )}`;
+  //console.log("Summarizing documents with prompt:", prompt);
+
+  try {
+    const response = await model.invoke([["human", prompt]]);
+    // console.log("Summarized documents response:", response);
+    // console.log("Summarized documents:", response.content);
+    return response.content;
+  } catch (error) {
+    console.error("Error during document summarization:", error);
+    return "An error occurred while summarizing the documents.";
+  }
+}
+
 // Generate the initial response with educational content
 async function generateInitialResponse(
   course,
@@ -89,14 +108,15 @@ async function generateInitialResponse(
     topic
   );
   try {
+    const initialDocuments = await summarizeDocuments(documents); //`\n\nDocuments:\n${documents.join("\n\n")}`;
     // Directly include the documents in the augmented query
-    const augmentedQuery = `${initialPrompt}\n\nDocuments:\n${documents.join(
-      "\n\n"
-    )}`;
+    const augmentedQuery = `${initialPrompt} \n\n this is the summary of the documents: """${initialDocuments}"""`;
+
     console.log("Augmented Query:", augmentedQuery);
 
     // const response = await model.invoke([["human", augmentedQuery]]);
 
+    //add initial documents during initial response generation, but not include in the conversation history
     const response = await model.invoke([["human", augmentedQuery]]);
 
     console.log("Response from model:", response.content);
@@ -114,94 +134,32 @@ async function generateInitialResponse(
   }
 }
 
-// // Retrieve the most relevant data from loaded documents
-// async function retrieveData(query, documents) {
-//   const queryTokens = tokenizer.tokenize(query.toLowerCase());
-//   let bestMatch = null;
-//   let highestScore = 0;
+// Retrieve the most relevant data from loaded documents
+async function retrieveData(query, documents) {
+  const queryTokens = tokenizer.tokenize(query.toLowerCase());
+  let bestMatch = null;
+  let highestScore = 0;
 
-//   documents.forEach((section) => {
-//     section.forEach((paragraph) => {
-//       let paragraphTokens = tokenizer.tokenize(paragraph.toLowerCase());
-//       let intersection = paragraphTokens.filter((token) =>
-//         queryTokens.includes(token)
-//       );
-//       let score = intersection.length;
+  documents.forEach((section) => {
+    section.forEach((paragraph) => {
+      let paragraphTokens = tokenizer.tokenize(paragraph.toLowerCase());
+      let intersection = paragraphTokens.filter((token) =>
+        queryTokens.includes(token)
+      );
+      let score = intersection.length;
 
-//       if (score > highestScore) {
-//         highestScore = score;
-//         bestMatch = paragraph;
-//       }
-//     });
-//   });
+      if (score > highestScore) {
+        highestScore = score;
+        bestMatch = paragraph;
+      }
+    });
+  });
 
-//   return (
-//     bestMatch ||
-//     "No detailed information found. Can you specify what part you're interested in?"
-//   );
-// }
-
-// // Generate the initial response with educational content
-// async function generateInitialResponse(prompt) {
-//   console.log("Prompt:", prompt);
-//   try {
-//     const documents = await loadDocuments();
-//     if (!documents.length) {
-//       return "Failed to load documents or documents are empty.";
-//     }
-//     const retrievedData = await retrieveData(prompt, documents);
-//     const augmentedQuery = retrievedData
-//       ? `${prompt} Considering this fact: ${retrievedData}.`
-//       : "Hello! I'm your AI-Tutor. What would you like to learn about today?";
-//     //const augmentedQuery = prompt;
-//     const response = await model.invoke([["human", augmentedQuery]]);
-//     //
-//     console.log("Response:", response.content);
-//     return {
-//       retrievedData: retrievedData,
-//       response: response,
-//       endConversation: false,
-//     };
-//   } catch (error) {
-//     console.error("Error during initial response generation:", error);
-//     return {
-//       response: "An error occurred while generating the response.",
-//       endConversation: true,
-//     };
-//   }
-// }
-
-// // Generate follow-up responses based on user interaction
-// async function generateFollowUpResponse(userInput, context) {
-//   try {
-//     const augmentedQuery = `${userInput.prompt} Considering your previous question: ${context.lastResponse}`;
-//     const response = await model.invoke([["human", augmentedQuery]]);
-
-//     return { response: response, endConversation: checkEndCondition(response) };
-//   } catch (error) {
-//     console.error("Error during follow-up response generation:", error);
-//     return {
-//       response: "An error occurred while generating the response.",
-//       endConversation: true,
-//     };
-//   }
-// }
-
-// Generate follow-up responses based on user interaction
-// async function generateFollowUpResponse(userInput, context) {
-//   try {
-//     const augmentedQuery = `${userInput.prompt} Considering your previous question: ${context.lastResponse}`;
-//     const response = await model.invoke([["human", augmentedQuery]]);
-
-//     return { response: response, endConversation: checkEndCondition(response) };
-//   } catch (error) {
-//     console.error("Error during follow-up response generation:", error);
-//     return {
-//       response: "An error occurred while generating the response.",
-//       endConversation: true,
-//     };
-//   }
-// }
+  return (
+    bestMatch ||
+    "No detailed information found. Ask user to query related information." //Can you specify what part you're interested in?"
+  );
+}
 
 //convert messages into human and ai for model query
 const convertMessages = (messages) => {
@@ -214,17 +172,68 @@ const convertMessages = (messages) => {
   });
 };
 
-async function generateFollowUpResponse(context) {
+async function readRepeatPrompt() {
+  const filePath = path.resolve(`./prompts/repeat_prompt.txt`);
+  console.log("Reading initial prompt from:", filePath);
+  const loader = new TextLoader(filePath);
+  const docs = await loader.load();
+  if (docs.length > 0) {
+    console.log("Initial prompt loaded:", docs[0].pageContent.trim());
+    return docs[0].pageContent.trim();
+  } else {
+    const defaultRepeatPrompt = ` Consider tutoring rules before answering ay questions`;
+    console.log(
+      "Repeat prompt file not found, using default repeat prompt:",
+      defaultRepeatPrompt
+    );
+    return defaultRepeatPrompt;
+  }
+}
+
+async function generateFollowUpResponse(context, documents) {
   try {
     // Convert the context object to a JSON string
     const contextText = JSON.stringify(convertMessages(context.messages));
     // const augmentedQuery = `$Answer the last user's question based on the conversation historys: ${contextText}`;
     // console.log("Augmented Query:", augmentedQuery);
 
-    const modelQuery = contextText;
-    console.log("Model Query:", modelQuery);
+    const repeatPrompt = await readRepeatPrompt();
 
-    const response = await model.invoke(modelQuery);
+    const modelQuery = JSON.parse(contextText);
+
+    // console.log("Model Query:", modelQuery);
+    // console.log(`type of modelQuery: ${typeof modelQuery}`);
+    // console.log(`modelQuery.length: ${modelQuery.length}`);
+    // console.log(
+    //   `modelQuery[modelQuery.length - 1]: ${modelQuery[modelQuery.length - 1]}`
+    // );
+
+    const query = modelQuery[modelQuery.length - 1][1];
+
+    // console.log(`query: ${query}`);
+    // console.log(`type of documents: ${typeof documents}`);
+
+    const queryRelatedContent = await retrieveData(query, documents);
+    const newQuery = [
+      "human",
+      `${query}, answer the question based on the notes provided if related.\n notes:"""${queryRelatedContent}""". Obey the tutor rules when answering the query from user: \n tutor rules:"""${repeatPrompt}"""`,
+    ];
+
+    console.log(`newQuery: ${newQuery}`);
+
+    // new model query modified last query to include retrived notes and tutor rules
+    // it is use to invoke the model but is not included in the conversation history
+    const newModelQuery = [
+      ...modelQuery.slice(0, modelQuery.length - 1),
+      newQuery,
+    ];
+
+    console.log("Model Query:", modelQuery);
+    console.log("New Model Query:", newModelQuery);
+    // console.log("type of New Model Query:", typeof newModelQuery);
+
+    //repeatPrompt is used to invoke the model but is not included in the
+    const response = await model.invoke(newModelQuery);
 
     console.log("Response from model:", response.content);
 
@@ -242,52 +251,6 @@ async function generateFollowUpResponse(context) {
 function checkEndCondition(response) {
   return response.text.includes("Do you have any other questions?");
 }
-
-//Get courses and topics for data folder
-// function getCoursesAndTopics() {
-//   return new Promise((resolve, reject) => {
-//     const coursesDir = path.join("data"); // Adjust the path as needed
-//     const courses = [];
-
-//     fs.readdir(coursesDir, (err, folders) => {
-//       if (err) {
-//         return reject(`Failed to read courses directory ${coursesDir}: ${err}`);
-//       }
-
-//       let foldersProcessed = 0;
-
-//       folders.forEach((folder) => {
-//         const folderPath = path.join(coursesDir, folder);
-
-//         console.log("Folder Path: ", folderPath);
-
-//         fs.stat(folderPath, (err, stats) => {
-//           if (err) {
-//             return reject(`Failed to stat entry: ${entry}`);
-//           }
-
-//           if (stats.isDirectory()) {
-//             fs.readdir(folderPath, (err, files) => {
-//               if (err) {
-//                 return reject(`Failed to read folder: ${folder}`);
-//               }
-
-//               console.log("Files: ", files, "Folder: ", folder);
-
-//               courses.push({ name: folder, topics: files });
-//             });
-//           }
-//           foldersProcessed++;
-
-//           if (foldersProcessed === folders.length) {
-//             console.log("Courses: ", courses);
-//             resolve(courses);
-//           }
-//         });
-//       });
-//     });
-//   });
-// }
 
 const readdir = promisify(fs.readdir);
 const stat = promisify(fs.stat);
@@ -323,20 +286,6 @@ const getCoursesAndTopics = () => {
       resolve(courses);
     } catch (error) {
       reject(`Failed to read courses directory: ${error.message}`);
-    }
-  });
-};
-
-//TODO - course path and name should be given by user
-const getFilesInCourse = (courseName) => {
-  return new Promise(async (resolve, reject) => {
-    try {
-      const coursePath = path.join("data", courseName);
-      const files = await readdir(coursePath);
-      const filePaths = files.map((file) => path.join(coursePath, file));
-      resolve(filePaths);
-    } catch (error) {
-      reject(`Failed to read files in course directory: ${error.message}`);
     }
   });
 };
